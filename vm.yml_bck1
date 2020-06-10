@@ -1,0 +1,168 @@
+---
+#import requests
+- hosts: vm
+  # tasks:
+#connection: local
+#  gather_facts: ture
+  vars_prompt:
+   - name: myuser
+     prompt: Enter the UserName
+     private: no
+   - name: mypass
+     prompt: Enter the Password
+   - name: vc_name
+     prompt: Enter the vCenter/ESXi HostName
+     private: no
+   - name: guest_name
+     prompt: Enter the Guest VM Name
+     private: no
+   - name: hdd
+     prompt: Enter the HardDrive Space you want to use by default 50 is for windows an 16 is for linux
+     private: no   
+   - name: ram
+     prompt: Enter the RAM in MB by default 2048 MB
+     private: no
+   - name: cpu
+     prompt: Enter the number of processor you want to use by default 2
+     private: no
+   - name: ip_addr
+     prompt: Enter the Ip address you want to specify
+     private: no
+   - name: vm_gateway
+     prompt: Enter the default gateway
+     private: no  
+     # tasks:
+     # - name: vm_password_new
+     # prompt: Enter new password for the system 
+     # tasks:
+     # - name: choose_os
+     #  command: ls/vmfs/volumes/datastore1/Iso
+   - name: os_system
+     private: no
+     prompt: |
+      Which os do you want to use?
+      1- Windows Server 
+      2- CentOS_7
+      3- CentOs_8
+      4- Ubuntu
+      5- Others
+      #   register: os
+  tasks:  
+   - name: Creation of Machine  
+     when: (os_system == "1")
+     vmware_deploy_ovf:
+             hostname: '{{ vc_name  }}'
+             username: '{{ myuser  }}'
+             password: '{{ mypass  }}'
+             name: '{{ guest_name }}'
+             datacenter: ha-datacenter
+             datastore: datastore1
+             validate_certs: no
+             ovf: /mnt/c/users/thinkpad/desktop/win_test/win_test.ovf
+             wait_for_ip_ address: true
+             state: poweredon
+     delegate_to: localhost
+     name: configure ip-address
+     local_action:
+             vmware_vm_shell:
+             vm_username: Administrator
+             vm_password: '{{ guest_password }}'
+             vm_id: '{{ guest_name  }}'
+             vm_shell: 'c:\windows\system32\windowspowershell\v1.0\powershell.exe'
+             vm_shell_args: '-command "(new-netipaddress -InterfaceAlias Ethernet0 -IPAddress {{ ip_addr }} -prefixlength 24 -defaultgateway {{ vm_gateway }})"' 
+             name: DNS IP
+             vm_shell: 'c:\windows\system32\windowspowershell\v1.0\powershell.exe'  
+             vm_shell_args: '-command "(Set-DnsClientServerAddress -InterfaceAlias Ethernet0 -ServerAddress 8.8.8.8)"'
+             name: machine_name
+             prompt: Enter the Machine Name
+             private: no
+             vm_shell:  'c:\windows\system32\windowspowershell\v1.0\powershell.exe'
+             vm_shell_args: '-command "(Rename-Computer -NewName {{ machine_name }})"'
+             #  name: reboot-guest
+             # vmware_guest_powerstate:
+             # name: "{{ guest_name }}"
+             # state: reboot-guest
+             #  delegate_to: localhost        
+     
+     #  - name: guests_facts  
+     # # tags: fac
+     # vmware_guest_facts:
+     #       hostname: "{{ vc_name }}"
+     #       username: "{{ myuser  }}"
+     #       password: "{{ mypass }}"
+     #       datacenter: ha-datacenter
+     #       validate_certs: no
+     #       name: "{{ guest_name }}"
+     # delegate_to: localhost
+     # register: facts
+     # - name: disks_facts
+     # tags: fac
+     # vmware_guest_disk_facts:   
+     #   hostname: "{{ vc_name }}"
+     #   username: "{{ myuser  }}"
+     #   password: "{{ mypass }}"
+     #   datacenter: ha-datacenter
+     #   validate_certs: no
+     #   name: "{{ guest_name }}"
+     #  delegate_to: localhost   
+     # when: os_system == "{{ os_system }}"  and hdd > "{{ hdd }}"
+     #  disk:
+     #        size-gb: "{{ hdd }}"
+     #        # type: thin
+     #        datastore: datastore1
+     # when: ( ram > "2048" )
+     # state: poweredoff
+     # - hardware:
+     #            memory_mb: "{{ ram  }}"      
+     # when: (cpu > "2")
+     # state: poweredoff
+     # - hardware:
+     #        num_cpu: "{{ cpu  }}"
+   - name: hdd increase
+     when: os_system == "{{ os_system }}" and capacity_in_kb < "{{ hdd }}" 
+     vmware_guest:
+      disk:
+             size-gb: "{{ hdd }}"
+             type: thin
+             datastore: datastore1
+             datacenter: ha-datacenter 
+     delegate_to: localhost
+   - name: memory_increase
+     when: hw_memtotal_mb > "{{ ram  }}"
+     vmware_guest:
+      state: poweredoff
+      hardware:
+             memory_mb: "{{ ram }}"
+             # datacenter: ha-datacenter
+     delegate_to: localhost
+   - name: cpu increase
+     when: hw_processor_count > "{{ cpu }}"
+     vmware_guest:
+      state: poweredoff
+      hardware:
+             num_cpu: "{{ cpu }} "
+     delegate_to: localhost
+   - name: creation of machine          
+     when: os_system == "2"
+     vmware_deploy_ovf:
+            hostname: '{{ vc_name  }}'
+            username: '{{ myuser  }}'
+            password: '{{ mypass  }}'
+            name: '{{ guest_name }}'
+            datacenter: ha-datacenter
+            datastore: datastore1
+            validate_certs: no
+            ovf: /mnt/c/users/thinkpad/desktop/root_test_mfa/root_test_mfa.ovf
+            wait_for_ip_ address: true
+            state: poweredon 
+   - name: configure ip-address
+     local_action:
+             vmware_vm_shell:
+                     vm_username: root
+                     vm_password: "{{ guest_password }}"
+                     vm_id:  "{{ guest_name }}"
+                     vm_shell: /uer/bin/sudo
+                     vm_shell_args: 'usr/sbin/ifconfig ens192 "{{ ip_addr }}" netmask 255.255.255.0 broadcast "" {{ vm_gateway }}"'
+                     vm_shell_cwd: "/usr/sbin"
+             delegate_to: localhost    
+
